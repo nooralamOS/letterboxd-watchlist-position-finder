@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Watchlist Finder — alazraq</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -50,22 +52,11 @@
       text-decoration: none;
     }
 
-    /* Letterboxd-style pill logo */
     .lb-mark {
-      width: 28px;
-      height: 19px;
-      display: flex;
-      gap: 2.5px;
+      height: 22px;
+      width: auto;
+      display: block;
     }
-
-    .lb-mark span {
-      flex: 1;
-      border-radius: 50px;
-    }
-
-    .lb-mark span:nth-child(1) { background: #00C030; }
-    .lb-mark span:nth-child(2) { background: #FF8000; }
-    .lb-mark span:nth-child(3) { background: #40BCF4; }
 
     .topbar-name {
       font-size: 13px;
@@ -383,9 +374,7 @@
 
 <nav class="topbar">
   <a class="topbar-logo" href="https://letterboxd.com/alazraq/watchlist/" target="_blank">
-    <div class="lb-mark">
-      <span></span><span></span><span></span>
-    </div>
+    <img class="lb-mark" src="logo-topbar.png" alt="Watchlist logo">
     <span class="topbar-name">Letterboxd <em>Watchlist Finder</em></span>
   </a>
 </nav>
