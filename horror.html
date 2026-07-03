@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horror Watchlist — alazraq</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0c0c0c;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 2rem 2rem 0;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; color: #fff; letter-spacing: -0.02em; }
+    header p  { font-size: 0.78rem; color: #555; margin-top: 0.25rem; }
+
+    #api-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    #api-bar label { font-size: 0.75rem; color: #666; white-space: nowrap; }
+    #api-key-input {
+      background: #181818;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 0.75rem;
+      padding: 0.35rem 0.7rem;
+      width: 260px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #api-key-input:focus { border-color: #c0392b; }
+    #api-key-input::placeholder { color: #444; }
+    #load-btn {
+      background: #c0392b;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.38rem 0.9rem;
+      transition: background 0.15s;
+    }
+    #load-btn:hover { background: #a93226; }
+    #api-hint { font-size: 0.7rem; color: #444; }
+    #api-hint a { color: #666; }
+
+    /* Tabs */
+    #tabs {
+      display: flex;
+      gap: 0.4rem;
+      padding: 1rem 2rem 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    #tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid #242424;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      color: #555;
+      cursor: pointer;
+      font-size: 0.73rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      white-space: nowrap;
+      transition: color 0.15s, background 0.15s;
+    }
+    .tab-btn:hover { color: #aaa; background: #141414; }
+    .tab-btn.active { background: #141414; border-color: #2a2a2a; color: #fff; }
+    .tab-btn .count {
+      background: #222;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      margin-left: 0.4rem;
+      padding: 0.1rem 0.45rem;
+      color: #666;
+    }
+    .tab-btn.active .count { background: #1e1e1e; color: #888; }
+
+    /* Grid */
+    #grid-container { padding: 1.5rem 2rem 3rem; }
+    .category-panel { display: none; }
+    .category-panel.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 1rem;
+    }
+
+    /* Cards */
+    .card { position: relative; }
+
+    .poster-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .poster-wrap {
+      aspect-ratio: 2/3;
+      background: #161616;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .poster-link:hover .poster-wrap {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.7), 0 0 0 1px #3a3a3a;
+    }
+
+    .poster-wrap img {
+      display: block;
+      height: 100%;
+      object-fit: cover;
+      width: 100%;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .poster-wrap img.loaded { opacity: 1; }
+
+    .skeleton {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, #161616 25%, #1f1f1f 50%, #161616 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .poster-wrap img.loaded ~ .skeleton { display: none; }
+
+    .no-poster {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      inset: 0;
+      font-size: 2rem;
+      color: #2a2a2a;
+    }
+
+    .card-info { margin-top: 0.45rem; padding: 0 0.1rem; }
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: #ccc;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-meta {
+      color: #555;
+      font-size: 0.65rem;
+      margin-top: 0.15rem;
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .card-pos {
+      color: #3d3d3d;
+      font-variant-numeric: tabular-nums;
+    }
+    .card-meta-sep { color: #2e2e2e; }
+
+    /* State */
+    #state-msg { font-size: 0.8rem; color: #555; padding: 3rem 2rem; text-align: center; }
+    #state-msg a { color: #c0392b; text-decoration: none; }
+    #state-msg a:hover { text-decoration: underline; }
+
+    #progress-bar { background: #1a1a1a; height: 2px; position: sticky; top: 0; z-index: 10; display: none; }
+    #progress-fill { background: #c0392b; height: 100%; width: 0%; transition: width 0.1s; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Horror Watchlist — alazraq</h1>
+  <p>~100 horror &amp; horror-adjacent films from a 672-film watchlist</p>
+  <div id="api-bar">
+    <label for="api-key-input">TMDB API key</label>
+    <input id="api-key-input" type="password" placeholder="Paste your v3 read access key…" autocomplete="off" />
+    <button id="load-btn">Load Posters</button>
+    <span id="api-hint">Free key at <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org</a></span>
+  </div>
+</header>
+
+<div id="progress-bar"><div id="progress-fill"></div></div>
+<nav id="tabs"></nav>
+<div id="grid-container">
+  <div id="state-msg">Enter your TMDB API key above and click <strong>Load Posters</strong>.</div>
+</div>
+
+<script>
+// pos = position in alazraq's full watchlist (1-indexed)
+// lbSlug = Letterboxd film slug override (auto-generated from title if omitted)
+const CATEGORIES = [
+  {
+    name: "Pure Horror",
+    films: [
+      { title: "Nosferatu",                          year: 1922, pos: 146 },
+      { title: "Freaks",                             year: 1932, pos: 494 },
+      { title: "Eyes Without a Face",                year: 1960, pos: 396 },
+      { title: "Kwaidan",                            year: 1964, pos: 404 },
+      { title: "Onibaba",                            year: 1964, pos: 308 },
+      { title: "Woh Kaun Thi",                       year: 1964, pos: 94  },
+      { title: "Black Christmas",                    year: 1974, pos: 107 },
+      { title: "The Texas Chain Saw Massacre",       year: 1974, pos: 598 },
+      { title: "House",                              year: 1977, pos: 631, lbSlug: "hausu" },
+      { title: "Nosferatu the Vampyre",              year: 1979, pos: 141 },
+      { title: "The Evil Dead",                      year: 1981, pos: 609 },
+      { title: "Possession",                         year: 1981, pos: 617, lbSlug: "possession-1981" },
+      { title: "Evil Dead II",                       year: 1987, pos: 612, lbSlug: "evil-dead-2" },
+      { title: "Army of Darkness",                   year: 1992, pos: 611 },
+      { title: "Cronos",                             year: 1993, pos: 73  },
+      { title: "Audition",                           year: 1999, pos: 635 },
+      { title: "Drag Me to Hell",                    year: 2009, pos: 610 },
+      { title: "A Girl Walks Home Alone at Night",   year: 2014, pos: 447 },
+      { title: "Thelma",                             year: 2017, pos: 247 },
+      { title: "The Wolf House",                     year: 2018, pos: 138 },
+      { title: "Marrowbone",                         year: 2018, pos: 140 },
+      { title: "Saint Maud",                         year: 2019, pos: 463 },
+      { title: "Gretel & Hansel",                    year: 2020, pos: 289, lbSlug: "gretel-hansel" },
+      { title: "Men",                                year: 2022, pos: 571, lbSlug: "men-2022" },
+      { title: "Speak No Evil",                      year: 2022, pos: 181, lbSlug: "speak-no-evil-2022" },
+      { title: "Cobweb",                             year: 2023, pos: 319, lbSlug: "cobweb-2023" },
+      { title: "It Lives Inside",                    year: 2023, pos: 307 },
+      { title: "In Flames",                          year: 2023, pos: 255 },
+      { title: "Shelby Oaks",                        year: 2024, pos: 50  },
+    ]
+  },
+  {
+    name: "Psychological Horror",
+    films: [
+      { title: "Peeping Tom",              year: 1960, pos: 501 },
+      { title: "The Silence of the Lambs", year: 1991, pos: 608 },
+      { title: "Gummo",                    year: 1997, pos: 632 },
+      { title: "Funny Games",              year: 1997, pos: 659 },
+      { title: "American Psycho",          year: 2000, pos: 62  },
+      { title: "The Others",               year: 2001, pos: 332 },
+      { title: "Visitor Q",                year: 2001, pos: 352 },
+      { title: "Ichi the Killer",          year: 2001, pos: 647 },
+      { title: "Pulse",                    year: 2001, pos: 464, lbSlug: "kairo" },
+      { title: "The Skin I Live In",       year: 2011, pos: 4   },
+      { title: "mother!",                  year: 2017, pos: 395, lbSlug: "mother-2017" },
+      { title: "The House That Jack Built",year: 2018, pos: 111 },
+    ]
+  },
+  {
+    name: "Horror Animation",
+    films: [
+      { title: "Belladonna of Sadness",       year: 1973, pos: 542 },
+      { title: "Angel's Egg",                 year: 1985, pos: 548 },
+      { title: "Vampire Hunter D: Bloodlust", year: 2000, pos: 547, lbSlug: "vampire-hunter-d-bloodlust" },
+      { title: "Mad God",                     year: 2021, pos: 564 },
+    ]
+  },
+  {
+    name: "Psychological Thriller",
+    films: [
+      { title: "Black Narcissus",             year: 1947, pos: 500 },
+      { title: "Strangers on a Train",        year: 1951, pos: 213 },
+      { title: "Don't Bother to Knock",       year: 1952, pos: 315, lbSlug: "dont-bother-to-knock" },
+      { title: "Diabolique",                  year: 1955, pos: 297 },
+      { title: "Vertigo",                     year: 1958, pos: 607 },
+      { title: "Knife in the Water",          year: 1962, pos: 69  },
+      { title: "Blow-Up",                     year: 1966, pos: 422, lbSlug: "blow-up" },
+      { title: "Obsession",                   year: 1976, pos: 6   },
+      { title: "Dressed to Kill",             year: 1980, pos: 342 },
+      { title: "Videodrome",                  year: 1983, pos: 363 },
+      { title: "Barton Fink",                 year: 1991, pos: 370 },
+      { title: "Benny's Video",               year: 1992, pos: 531, lbSlug: "bennys-video" },
+      { title: "Primal Fear",                 year: 1996, pos: 330 },
+      { title: "The Devil's Advocate",        year: 1997, pos: 40,  lbSlug: "the-devils-advocate" },
+      { title: "Open Your Eyes",              year: 1997, pos: 491 },
+      { title: "The Game",                    year: 1997, pos: 354 },
+      { title: "eXistenZ",                    year: 1999, pos: 86,  lbSlug: "existenz" },
+      { title: "Following",                   year: 1998, pos: 109 },
+      { title: "Pi",                          year: 1998, pos: 477, lbSlug: "pi-1998" },
+      { title: "One Hour Photo",              year: 2002, pos: 3   },
+      { title: "Identity",                    year: 2003, pos: 323, lbSlug: "identity-2003" },
+      { title: "Swimming Pool",               year: 2003, pos: 328 },
+      { title: "Mystic River",                year: 2003, pos: 333 },
+      { title: "Secret Window",               year: 2004, pos: 335 },
+      { title: "Side Effects",                year: 2013, pos: 327, lbSlug: "side-effects-2013" },
+      { title: "Coherence",                   year: 2013, pos: 34  },
+      { title: "The Best Offer",              year: 2013, pos: 336 },
+      { title: "Filth",                       year: 2013, pos: 112 },
+      { title: "Predestination",              year: 2014, pos: 329 },
+      { title: "The Happening",               year: 2008, pos: 339, lbSlug: "the-happening-2008" },
+      { title: "Dogtooth",                    year: 2009, pos: 468 },
+      { title: "We Need to Talk About Kevin", year: 2011, pos: 443 },
+      { title: "Cosmopolis",                  year: 2012, pos: 457 },
+      { title: "The Neon Demon",              year: 2016, pos: 528 },
+      { title: "Krisha",                      year: 2015, pos: 366 },
+      { title: "Burning",                     year: 2018, pos: 305 },
+      { title: "Holy Spider",                 year: 2022, pos: 171 },
+      { title: "The Humans",                  year: 2021, pos: 466 },
+      { title: "Dream Scenario",              year: 2023, pos: 311 },
+    ]
+  },
+  {
+    name: "Dark & Transgressive",
+    films: [
+      { title: "Funeral Parade of Roses",      year: 1969, pos: 85  },
+      { title: "A Clockwork Orange",           year: 1971, pos: 662 },
+      { title: "Lady Snowblood",               year: 1973, pos: 202 },
+      { title: "The Holy Mountain",            year: 1973, pos: 630 },
+      { title: "Phantom of the Paradise",      year: 1974, pos: 199 },
+      { title: "Picnic at Hanging Rock",       year: 1975, pos: 515 },
+      { title: "Brazil",                       year: 1985, pos: 616 },
+      { title: "Threads",                      year: 1984, pos: 563 },
+      { title: "Natural Born Killers",         year: 1994, pos: 532 },
+      { title: "Crash",                        year: 1996, pos: 115, lbSlug: "crash-1996" },
+      { title: "Eyes Wide Shut",               year: 1999, pos: 622 },
+      { title: "Donnie Darko",                 year: 2001, pos: 588 },
+      { title: "Sympathy for Mr. Vengeance",   year: 2002, pos: 258 },
+      { title: "Mysterious Skin",              year: 2004, pos: 13  },
+      { title: "Lady Vengeance",               year: 2005, pos: 634 },
+      { title: "Inland Empire",                year: 2006, pos: 355 },
+      { title: "Tony",                         year: 2009, pos: 65,  lbSlug: "tony-2009" },
+      { title: "The Childhood of a Leader",    year: 2015, pos: 149 },
+      { title: "Revenge",                      year: 2017, pos: 179, lbSlug: "revenge-2017" },
+      { title: "Mayhem",                       year: 2017, pos: 465, lbSlug: "mayhem-2017" },
+      { title: "Ready or Not",                 year: 2019, pos: 553 },
+      { title: "The Green Knight",             year: 2021, pos: 661 },
+      { title: "The Northman",                 year: 2022, pos: 362 },
+      { title: "Society of the Snow",          year: 2023, pos: 278 },
+      { title: "Leave the World Behind",       year: 2023, pos: 287 },
+    ]
+  }
+];
+
+const IMG_BASE = "https://image.tmdb.org/t/p/w342";
+const ENV_TMDB_KEY = "";
+let apiKey = ENV_TMDB_KEY || localStorage.getItem("tmdb_key") || "";
+
+const keyInput    = document.getElementById("api-key-input");
+const loadBtn     = document.getElementById("load-btn");
+const tabsEl      = document.getElementById("tabs");
+const gridContainer = document.getElementById("grid-container");
+const progressBar = document.getElementById("progress-bar");
+const progressFill = document.getElementById("progress-fill");
+
+if (apiKey) {
+  keyInput.value = apiKey;
+  document.getElementById("api-bar").style.display = "none";
+}
+
+function lbUrl(film) {
+  const slug = film.lbSlug || film.title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+  return `https://letterboxd.com/film/${slug}/`;
+}
+
+function buildTabs() {
+  tabsEl.innerHTML = "";
+  CATEGORIES.forEach((cat, i) => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (i === 0 ? " active" : "");
+    btn.innerHTML = `${cat.name}<span class="count">${cat.films.length}</span>`;
+    btn.addEventListener("click", () => switchTab(i));
+    tabsEl.appendChild(btn);
+  });
+}
+
+function switchTab(index) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => b.classList.toggle("active", i === index));
+  document.querySelectorAll(".category-panel").forEach((p, i) => p.classList.toggle("active", i === index));
+}
+
+function buildGrids(posterMap) {
+  gridContainer.innerHTML = "";
+
+  CATEGORIES.forEach((cat, catIdx) => {
+    const panel = document.createElement("div");
+    panel.className = "category-panel" + (catIdx === 0 ? " active" : "");
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+
+    cat.films.forEach(film => {
+      const posterUrl = posterMap[`${film.title}|${film.year}`];
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      // clickable poster link
+      const link = document.createElement("a");
+      link.className = "poster-link";
+      link.href = lbUrl(film);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.title = `${film.title} on Letterboxd`;
+
+      const wrap = document.createElement("div");
+      wrap.className = "poster-wrap";
+
+      const img = document.createElement("img");
+      img.alt = film.title;
+
+      const skeleton = document.createElement("div");
+      skeleton.className = "skeleton";
+
+      const noPost = document.createElement("div");
+      noPost.className = "no-poster";
+      noPost.textContent = "🎬";
+
+      if (posterUrl) {
+        img.src = posterUrl;
+        img.onload  = () => { img.classList.add("loaded"); skeleton.style.display = "none"; };
+        img.onerror = () => { skeleton.style.display = "none"; noPost.style.display = "flex"; };
+      } else {
+        skeleton.style.display = "none";
+        noPost.style.display = "flex";
+      }
+
+      wrap.appendChild(img);
+      wrap.appendChild(skeleton);
+      wrap.appendChild(noPost);
+      link.appendChild(wrap);
+
+      const info = document.createElement("div");
+      info.className = "card-info";
+      info.innerHTML = `
+        <div class="card-title">${film.title}</div>
+        <div class="card-meta">
+          <span>${film.year}</span>
+          <span class="card-meta-sep">·</span>
+          <span class="card-pos">#${film.pos}</span>
+        </div>`;
+
+      card.appendChild(link);
+      card.appendChild(info);
+      grid.appendChild(card);
+    });
+
+    panel.appendChild(grid);
+    gridContainer.appendChild(panel);
+  });
+}
+
+async function fetchPoster(film, key) {
+  try {
+    const url = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${encodeURIComponent(film.title)}&year=${film.year}&include_adult=false`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data.results?.[0];
+    return result?.poster_path ? `${IMG_BASE}${result.poster_path}` : null;
+  } catch { return null; }
+}
+
+async function loadAll() {
+  const key = keyInput.value.trim();
+  if (!key) return;
+  apiKey = key;
+  localStorage.setItem("tmdb_key", key);
+
+  gridContainer.innerHTML = '<div id="state-msg">Loading posters…</div>';
+  progressBar.style.display = "block";
+  progressFill.style.width = "0%";
+
+  const allFilms = CATEGORIES.flatMap(c => c.films);
+  const total = allFilms.length;
+  let done = 0;
+  const posterMap = {};
+
+  const BATCH = 8;
+  for (let i = 0; i < allFilms.length; i += BATCH) {
+    const batch = allFilms.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(f => fetchPoster(f, key)));
+    batch.forEach((f, j) => { posterMap[`${f.title}|${f.year}`] = results[j]; });
+    done += batch.length;
+    progressFill.style.width = `${Math.round((done / total) * 100)}%`;
+  }
+
+  progressBar.style.display = "none";
+  buildTabs();
+  buildGrids(posterMap);
+}
+
+loadBtn.addEventListener("click", loadAll);
+keyInput.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); });
+
+buildTabs();
+if (apiKey) {
+  loadAll();
+} else {
+  gridContainer.innerHTML = '<div id="state-msg">Enter your TMDB API key above and click <strong>Load Posters</strong>.</div>';
+}
+</script>
+</body>
+</html>
