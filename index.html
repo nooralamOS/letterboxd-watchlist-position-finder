@@ -418,7 +418,7 @@
 
   </div>
 
-  <footer>alazraq &bull; Letterboxd watchlist &bull; 661 films</footer>
+  <footer>alazraq &bull; Letterboxd watchlist &bull; refreshed daily</footer>
 </div>
 
 <script>
@@ -430,47 +430,60 @@
   const warmupDot = document.getElementById('warmupDot');
   const warmupTxt = document.getElementById('warmupText');
 
-  // Poll /api/status until cache is ready
-  async function pollStatus() {
+  // Load the watchlist snapshot (regenerated daily by a GitHub Action)
+  let films = null;
+
+  async function loadWatchlist() {
     try {
-      const res  = await fetch('/api/status');
+      const res  = await fetch('watchlist.json', { cache: 'no-cache' });
       const data = await res.json();
-      if (data.ready) {
-        warmupDot.classList.add('ready');
-        warmupTxt.textContent = `${data.count} films loaded`;
-        setTimeout(() => warmup.classList.add('hidden'), 1200);
-        return;
-      }
-    } catch {}
-    setTimeout(pollStatus, 600);
-  }
-  pollStatus();
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const q = input.value.trim();
-    if (!q) return;
-
-    btn.disabled = true;
-    btn.textContent = '…';
-    result.innerHTML = `
-      <div class="loading">
-        <div class="dots">
-          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-        </div>
-        Scanning watchlist
-      </div>`;
-
-    try {
-      const res  = await fetch('/api/search?q=' + encodeURIComponent(q));
-      const data = await res.json();
-      render(data, q);
+      films = data.films;
+      warmupDot.classList.add('ready');
+      warmupTxt.textContent = `${data.count} films · updated ${data.updated.slice(0, 10)}`;
+      setTimeout(() => warmup.classList.add('hidden'), 1800);
     } catch {
-      result.innerHTML = `<div class="not-found">Could not reach the server.</div>`;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Find';
+      warmupTxt.textContent = 'Could not load watchlist data.';
     }
+  }
+  loadWatchlist();
+
+  function stripYear(name) {
+    return name.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+  }
+
+  // Match score: 3=exact name, 2=exact slug, 1=substring, 0=no match
+  function score(film, q) {
+    const nameBare = stripYear(film.name).toLowerCase();
+    const nameFull = film.name.toLowerCase();
+    const slug = film.slug.toLowerCase();
+    if (q === nameBare || q === nameFull) return 3;
+    if (q === slug || q === slug.replace(/-/g, ' ')) return 2;
+    if (nameBare.includes(q) || nameFull.includes(q)) return 1;
+    return 0;
+  }
+
+  function search(q) {
+    const matches = [];
+    films.forEach((film, i) => {
+      const s = score(film, q);
+      if (s > 0) matches.push({ position: i + 1, name: film.name, slug: film.slug, score: s });
+    });
+    if (!matches.length) return { error: 'not found' };
+    matches.sort((a, b) => b.score - a.score);
+    const best = matches[0].score;
+    const shown = best >= 2 ? matches.filter(m => m.score === best) : matches;
+    return { results: shown };
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim().toLowerCase();
+    if (!q) return;
+    if (!films) {
+      result.innerHTML = `<div class="not-found">Watchlist is still loading…</div>`;
+      return;
+    }
+    render(search(q), q);
   });
 
   function esc(s) {
